@@ -3,6 +3,7 @@ package com.quantifind.kafka.core
 import com.quantifind.kafka.offsetapp.OffsetGetterArgs
 import com.quantifind.utils.ZkUtilsWrapper
 import java.nio.{BufferUnderflowException, ByteBuffer}
+import java.util.Optional
 
 import kafka.api.{OffsetRequest, OffsetResponse, PartitionOffsetsResponse}
 import kafka.common.{OffsetAndMetadata, OffsetMetadata, TopicAndPartition}
@@ -36,7 +37,7 @@ class KafkaOffsetGetterSpec extends FlatSpec with ShouldMatchers {
 
   "KafkaOffsetGetter" should "be able to build offset data for given partition" in new Fixture {
 
-    val testGroup = "console-consumer-48825"
+    val testGroup = "testgroup"
     val testTopic = "test"
     val testPartition = 1
     val committedOffset = 100
@@ -150,7 +151,7 @@ class KafkaOffsetGetterSpec extends FlatSpec with ShouldMatchers {
     val group: String = "group-test"
     val commitTimestamp: Long = 12345
     val offsetMetadata: OffsetMetadata = new OffsetMetadata(offset, metadata)
-    val offsetAndMetadata: OffsetAndMetadata = new OffsetAndMetadata(offsetMetadata, commitTimestamp, commitTimestamp)
+    val offsetAndMetadata: OffsetAndMetadata = new OffsetAndMetadata(offset,Optional.empty(),metadata, commitTimestamp, commitTimestamp)
 
     val key: Array[Byte] = KafkaMessageProtocolHelper.offsetCommitKey(group, topic, partition, 1.toShort)
     val value: Array[Byte] = KafkaMessageProtocolHelper.offsetCommitValue(offsetAndMetadata)
