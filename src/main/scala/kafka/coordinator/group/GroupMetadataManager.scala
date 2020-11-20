@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
 import com.yammer.metrics.core.Gauge
-import kafka.api.{ApiVersion, KAFKA_0_10_1_IV0}
+import kafka.api.{ApiVersion, KAFKA_0_10_1_IV0, KAFKA_2_1_IV0, KAFKA_2_1_IV1}
 import kafka.common.{MessageFormatter, _}
 import kafka.metrics.KafkaMetricsGroup
 import kafka.server.ReplicaManager
@@ -86,7 +86,9 @@ class GroupMetadataManager(brokerId: Int,
   newGauge("NumOffsets",
     new Gauge[Int] {
       def value = groupMetadataCache.values.map(group => {
-        group.inLock { group.numOffsets }
+        group.inLock {
+          group.numOffsets
+        }
       }).sum
     }
   )
@@ -109,9 +111,13 @@ class GroupMetadataManager(brokerId: Int,
 
   def currentGroups: Iterable[GroupMetadata] = groupMetadataCache.values
 
-  def isPartitionOwned(partition: Int) = inLock(partitionLock) { ownedPartitions.contains(partition) }
+  def isPartitionOwned(partition: Int) = inLock(partitionLock) {
+    ownedPartitions.contains(partition)
+  }
 
-  def isPartitionLoading(partition: Int) = inLock(partitionLock) { loadingPartitions.contains(partition) }
+  def isPartitionLoading(partition: Int) = inLock(partitionLock) {
+    loadingPartitions.contains(partition)
+  }
 
   def partitionFor(groupId: String): Int = Utils.abs(groupId.hashCode) % groupMetadataTopicPartitionCount
 
@@ -119,7 +125,9 @@ class GroupMetadataManager(brokerId: Int,
 
   def isGroupLoading(groupId: String): Boolean = isPartitionLoading(partitionFor(groupId))
 
-  def isLoading(): Boolean = inLock(partitionLock) { loadingPartitions.nonEmpty }
+  def isLoading(): Boolean = inLock(partitionLock) {
+    loadingPartitions.nonEmpty
+  }
 
   // visible for testing
   private[group] def isGroupOpenForProducer(producerId: Long, groupId: String) = openGroupsForProducer.get(producerId) match {
@@ -128,6 +136,7 @@ class GroupMetadataManager(brokerId: Int,
     case None =>
       false
   }
+
   /**
     * Get the group associated with the given groupId, or null if not found
     */
@@ -226,6 +235,7 @@ class GroupMetadataManager(brokerId: Int,
 
           responseCallback(responseError)
         }
+
         appendForGroup(group, groupMetadataRecords, putCacheCallback)
 
       case None =>
@@ -285,7 +295,7 @@ class GroupMetadataManager(brokerId: Int,
 
           val records = filteredOffsetMetadata.map { case (topicPartition, offsetAndMetadata) =>
             val key = GroupMetadataManager.offsetCommitKey(group.groupId, topicPartition)
-            val value = GroupMetadataManager.offsetCommitValue(offsetAndMetadata)
+            val value = GroupMetadataManager.offsetCommitValue(offsetAndMetadata, interBrokerProtocolVersion)
             new SimpleRecord(timestamp, key, value)
           }
           val offsetTopicPartition = new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, partitionFor(group.groupId))
@@ -564,7 +574,7 @@ class GroupMetadataManager(brokerId: Int,
           producerOffsets.keySet.map(_.group).foreach(addProducerGroup(producerId, _))
           producerOffsets
             .groupBy(_._1.group)
-            .mapValues(_.map { case (groupTopicPartition, offset) => (groupTopicPartition.topicPartition, offset)})
+            .mapValues(_.map { case (groupTopicPartition, offset) => (groupTopicPartition.topicPartition, offset) })
             .foreach { case (group, offsets) =>
               val groupPendingOffsets = pendingOffsetsByGroup.getOrElseUpdate(group, mutable.Map.empty[Long, mutable.Map[TopicPartition, CommitRecordMetadataAndOffset]])
               val groupProducerOffsets = groupPendingOffsets.getOrElseUpdate(producerId, mutable.Map.empty[TopicPartition, CommitRecordMetadataAndOffset])
@@ -573,7 +583,7 @@ class GroupMetadataManager(brokerId: Int,
         }
 
         val (pendingGroupOffsets, pendingEmptyGroupOffsets) = pendingOffsetsByGroup
-          .partition { case (group, _) => loadedGroups.contains(group)}
+          .partition { case (group, _) => loadedGroups.contains(group) }
 
         loadedGroups.values.foreach { group =>
           val offsets = groupOffsets.getOrElse(group.groupId, Map.empty[TopicPartition, CommitRecordMetadataAndOffset])
@@ -585,7 +595,7 @@ class GroupMetadataManager(brokerId: Int,
 
         // load groups which store offsets in kafka, but which have no active members and thus no group
         // metadata stored in the log
-        (emptyGroupOffsets.keySet ++ pendingEmptyGroupOffsets.keySet).foreach { case(groupId) =>
+        (emptyGroupOffsets.keySet ++ pendingEmptyGroupOffsets.keySet).foreach { case (groupId) =>
           val group = new GroupMetadata(groupId)
           val offsets = emptyGroupOffsets.getOrElse(groupId, Map.empty[TopicPartition, CommitRecordMetadataAndOffset])
           val pendingOffsets = pendingEmptyGroupOffsets.getOrElse(groupId, Map.empty[Long, mutable.Map[TopicPartition, CommitRecordMetadataAndOffset]])
@@ -800,7 +810,7 @@ class GroupMetadataManager(brokerId: Int,
   /*
    * Check if the offset metadata length is valid
    */
-  private def validateOffsetMetadataLength(metadata: String) : Boolean = {
+  private def validateOffsetMetadataLength(metadata: String): Boolean = {
     metadata == null || metadata.length() <= config.maxMetadataSize
   }
 
@@ -824,8 +834,8 @@ class GroupMetadataManager(brokerId: Int,
   /**
     * Check if the replica is local and return the message format version and timestamp
     *
-    * @param   partition  Partition of GroupMetadataTopic
-    * @return  Some(MessageFormatVersion) if replica is local, None otherwise
+    * @param   partition Partition of GroupMetadataTopic
+    * @return Some(MessageFormatVersion) if replica is local, None otherwise
     */
   private def getMagic(partition: Int): Option[Byte] =
     replicaManager.getMagic(new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, partition))
@@ -849,13 +859,13 @@ class GroupMetadataManager(brokerId: Int,
   * version is used to evolve the messages within their data types:
   *
   * key version 0:       group consumption offset
-  *    -> value version 0:       [offset, metadata, timestamp]
+  * -> value version 0:       [offset, metadata, timestamp]
   *
   * key version 1:       group consumption offset
-  *    -> value version 1:       [offset, metadata, commit_timestamp, expire_timestamp]
+  * -> value version 1:       [offset, metadata, commit_timestamp, expire_timestamp]
   *
   * key version 2:       group metadata
-  *     -> value version 0:       [protocol_type, generation, protocol, leader, members]
+  * -> value version 0:       [protocol_type, generation, protocol, leader, members]
   */
 object GroupMetadataManager {
 
@@ -964,7 +974,7 @@ object GroupMetadataManager {
     1 -> OFFSET_COMMIT_VALUE_SCHEMA_V1,
     2 -> OFFSET_COMMIT_VALUE_SCHEMA_V2,
     3 -> OFFSET_COMMIT_VALUE_SCHEMA_V3
-    )
+  )
   private val CURRENT_OFFSET_VALUE_SCHEMA_VERSION = 1.toShort
 
   // map of version of group metadata value schemas
@@ -1042,13 +1052,36 @@ object GroupMetadataManager {
     * @param offsetAndMetadata consumer's current offset and metadata
     * @return payload for offset commit message
     */
-  private[group] def offsetCommitValue(offsetAndMetadata: OffsetAndMetadata): Array[Byte] = {
-    // generate commit value with schema version 1
-    val value = new Struct(CURRENT_OFFSET_VALUE_SCHEMA)
-    value.set(OFFSET_VALUE_OFFSET_FIELD_V1, offsetAndMetadata.offset)
-    value.set(OFFSET_VALUE_METADATA_FIELD_V1, offsetAndMetadata.metadata)
-    value.set(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V1, offsetAndMetadata.commitTimestamp)
-    value.set(OFFSET_VALUE_EXPIRE_TIMESTAMP_FIELD_V1, offsetAndMetadata.expireTimestamp)
+  private[group] def offsetCommitValue(offsetAndMetadata: OffsetAndMetadata,
+                                       apiVersion: ApiVersion): Array[Byte] = {
+    // generate commit value according to schema version
+    val (version, value) = {
+      if (apiVersion < KAFKA_2_1_IV0) {
+        val value = new Struct(OFFSET_COMMIT_VALUE_SCHEMA_V1)
+        value.set(OFFSET_VALUE_OFFSET_FIELD_V1, offsetAndMetadata.offset)
+        value.set(OFFSET_VALUE_METADATA_FIELD_V1, offsetAndMetadata.metadata)
+        value.set(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V1, offsetAndMetadata.commitTimestamp)
+        // version 1 has a non empty expireTimestamp field
+        value.set(OFFSET_VALUE_EXPIRE_TIMESTAMP_FIELD_V1,
+          offsetAndMetadata.expireTimestamp)
+        (1, value)
+      } else if (apiVersion < KAFKA_2_1_IV1) {
+        val value = new Struct(OFFSET_COMMIT_VALUE_SCHEMA_V2)
+        value.set(OFFSET_VALUE_OFFSET_FIELD_V2, offsetAndMetadata.offset)
+        value.set(OFFSET_VALUE_METADATA_FIELD_V2, offsetAndMetadata.metadata)
+        value.set(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V2, offsetAndMetadata.commitTimestamp)
+        (2, value)
+      } else {
+        val value = new Struct(OFFSET_COMMIT_VALUE_SCHEMA_V3)
+        value.set(OFFSET_VALUE_OFFSET_FIELD_V3, offsetAndMetadata.offset)
+        value.set(OFFSET_VALUE_LEADER_EPOCH_FIELD_V3,
+          offsetAndMetadata.leaderEpoch.orElse(RecordBatch.NO_PARTITION_LEADER_EPOCH))
+        value.set(OFFSET_VALUE_METADATA_FIELD_V3, offsetAndMetadata.metadata)
+        value.set(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V3, offsetAndMetadata.commitTimestamp)
+        (3, value)
+      }
+    }
+
     val byteBuffer = ByteBuffer.allocate(2 /* version */ + value.sizeOf)
     byteBuffer.putShort(CURRENT_OFFSET_VALUE_SCHEMA_VERSION)
     value.writeTo(byteBuffer)
@@ -1060,8 +1093,8 @@ object GroupMetadataManager {
     * assuming the generation id, selected protocol, leader and member assignment are all available
     *
     * @param groupMetadata current group metadata
-    * @param assignment the assignment for the rebalancing generation
-    * @param version the version of the value message to use
+    * @param assignment    the assignment for the rebalancing generation
+    * @param version       the version of the value message to use
     * @return payload for offset commit message
     */
   private[group] def groupMetadataValue(groupMetadata: GroupMetadata,
@@ -1159,7 +1192,7 @@ object GroupMetadataManager {
         val expireTimestamp = value.get(OFFSET_VALUE_EXPIRE_TIMESTAMP_FIELD_V1).asInstanceOf[Long]
 
         OffsetAndMetadata(offset, metadata, commitTimestamp, expireTimestamp)
-      }else if (version == 2) {
+      } else if (version == 2) {
         val offset = value.get(OFFSET_VALUE_OFFSET_FIELD_V2).asInstanceOf[Long]
         val metadata = value.get(OFFSET_VALUE_METADATA_FIELD_V2).asInstanceOf[String]
         val commitTimestamp = value.get(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V2).asInstanceOf[Long]
@@ -1284,8 +1317,9 @@ case class GroupTopicPartition(group: String, topicPartition: TopicPartition) {
     "[%s,%s,%d]".format(group, topicPartition.topic, topicPartition.partition)
 }
 
-trait BaseKey{
+trait BaseKey {
   def version: Short
+
   def key: Any
 }
 
