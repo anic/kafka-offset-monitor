@@ -69,12 +69,12 @@ This is a small web app, you can run it locally or on a server, as long as you h
 ```
 
 java -Djava.security.auth.login.config=conf/server-client-jaas.conf \
-	-cp KafkaOffsetMonitor-assembly-0.4.6-SNAPSHOT.jar \
+	-cp KafkaOffsetMonitor-assembly-0.4.7-SNAPSHOT.jar \
        com.quantifind.kafka.offsetapp.OffsetGetterWeb \
      --offsetStorage kafka \
-     --kafkaBrokers kafkabroker01:6667,kafkabroker02:6667 \
+     --kafkaBrokers kafkabroker01:9092,kafkabroker02:9092 \
      --kafkaSecurityProtocol SASL_PLAINTEXT \
-     --zk zkserver01,zkserver02 \
+     --zk zkserver01:2181,zkserver02:2181 \
      --port 8081 \
      --refresh 10.seconds \
      --retain 2.days \
