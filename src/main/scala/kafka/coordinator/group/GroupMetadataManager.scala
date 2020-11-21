@@ -47,6 +47,15 @@ import scala.collection.JavaConverters._
 import scala.collection._
 import scala.collection.mutable.ListBuffer
 
+/**
+  *  Merge 0.11.3 and 2.4.1 version of GroupMetadataManager.scala
+  * @param brokerId
+  * @param interBrokerProtocolVersion
+  * @param config
+  * @param replicaManager
+  * @param zkUtils
+  * @param time
+  */
 class GroupMetadataManager(brokerId: Int,
                            interBrokerProtocolVersion: ApiVersion,
                            config: OffsetConfig,

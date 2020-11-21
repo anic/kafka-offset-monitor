@@ -2,6 +2,15 @@ package kafka.common
 
 import java.util.Optional
 
+/**
+  * Merge 0.11.3 and 2.4.1 version of OffsetAndMetadata.scala
+  * 
+  * @param offset
+  * @param leaderEpoch
+  * @param metadata
+  * @param commitTimestamp
+  * @param expireTimestamp
+  */
 case class OffsetAndMetadata(offset: Long,
                              leaderEpoch: Optional[Integer],
                              metadata: String,
