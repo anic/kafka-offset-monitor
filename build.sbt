@@ -27,7 +27,8 @@ libraryDependencies ++= Seq(
 
 assemblyMergeStrategy in assembly := {
   case "about.html" => MergeStrategy.discard
-  case x => {
+	case PathList("kafka", xs @ _*) => MergeStrategy.first
+	case x => {
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
   }
