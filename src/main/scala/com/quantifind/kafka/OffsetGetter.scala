@@ -15,6 +15,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.security.JaasUtils
 
 import scala.collection._
+import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
 
@@ -85,10 +86,19 @@ trait OffsetGetter extends Logging {
 	}
 
 	protected def brokerInfo(): Iterable[BrokerInfo] = {
-		for {
-			(bid, consumerOpt) <- consumerMap
-			consumer <- consumerOpt
-		} yield BrokerInfo(id = bid, host = consumer.host, port = consumer.port)
+			//Dont work
+//		for {
+//			(bid, consumerOpt) <- consumerMap
+//			consumer <- consumerOpt
+//		} yield BrokerInfo(id = bid, host = consumer.host, port = consumer.port)
+
+		val brokers = ArrayBuffer[BrokerInfo]();
+		zkUtils.getAllBrokersInCluster().foreach((broker) => {
+			broker.endPoints.foreach((endPoint)=>{
+				brokers += BrokerInfo(id = broker.id, host = endPoint.host, port = endPoint.port);
+			})
+		})
+		brokers.toIndexedSeq
 	}
 
 	protected def offsetInfo(group: String, topics: Seq[String] = Seq()): Seq[OffsetInfo] = {
