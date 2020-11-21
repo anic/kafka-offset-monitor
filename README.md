@@ -3,6 +3,18 @@ Kafka Offset Monitor
 
 [![Build Status](https://travis-ci.org/Morningstar/kafka-offset-monitor.svg?branch=master)](https://travis-ci.org/Morningstar/kafka-offset-monitor)
 
+## What's new in 0.4.7
+
+Since the [origin Kafka Offset Monitor project](http://quantifind.github.io/KafkaOffsetMonitor/) is off from github, many developers have upgraded it by forking the project. I tried the 0.4.6 version of Kafka Offset Monitor by [Morningstar](https://github.com/Morningstar/kafka-offset-monitor)，but it worked not so well. 
+
+- Add Support for Apache Kafka 2.6.0, upgrade the `GroupMetadataManager` so that it can `readOffsetMessageValue` with the newly Kafka message version
+- Fix the bug that can't load the broker list
+- Intergate the javascript and css resources to the project,  for purely inernal network monitoring.
+
+
+
+## About Kafka Offset Monitor
+
 This is an app to monitor your kafka consumers and their position (offset) in the log.
 
 You can see the current consumer groups, for each group the topics that they are consuming and the position of the group in each topic log. This is useful to understand how quick you are consuming from a log and how fast the log is growing. It allows for debuging kafka producers and consumers or just to have an idea of what is going on in your system.
@@ -98,7 +110,7 @@ Special Notes on Storm Storage
 
 By default, Storm Kafka Spout stores offsets in ZK in a directory specified via ''SpoutConfig''. At same time, Kafka also stores its meta-data inside zookeeper. 
 In order to monitor Storm Kafka Spout offsets, KafkaOffsetMonitor requires that:
- 
+
  * Spout and Kafka use the same zookeeper cluster
  * Spout stores the offsets under a sub-directory of Kafka's meta-data directory 
 
